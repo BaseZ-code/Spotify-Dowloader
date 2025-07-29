@@ -44,20 +44,32 @@ class Metadata():
     # Append each metadata lists in to a list. Metadata list -> [name, artists, album, release date]
     def track_metadata(self, playlist:bool) -> list:
         metadata = []
+        current_track = 0
         if playlist:
-            tracks = sp.playlist_items(self.url, limit=100, offset=100, additional_types=('track',))
-            print(tracks)
-            for track in tracks['items']:
-                metadata.append([track["name"], 
-                        track["artists"][0]["name"], 
-                        track["album"]["name"],
-                        track["album"]["release_date"],])
+            while True:
+                whole_tracks = sp.playlist(self.url, additional_types=('track',))
+                tracks = sp.playlist_items(self.url, limit=100, offset=current_track, additional_types=('track',))
+                track = tracks["items"][0]['track']
+                total_tracks = len(whole_tracks['tracks']['items'])
+                current_track += 1
+                metadata.append([track['name'], 
+                            track['artists'][0]['name'], 
+                            track["album"]["name"],
+                            track["album"]["release_date"]])
+                
+                print(metadata[current_track-1])
+                print(current_track)
+                if current_track == total_tracks:
+                    break
+                else:
+                    continue
+
         elif not playlist:
-            track_data = sp.track(self.url)
-            metadata.append([track_data["name"], 
-                        track_data["artists"][0]["name"], 
-                        track_data["album"]["name"],
-                        track_data["album"]["release_date"],])
+            tracks = sp.track(self.url)
+            metadata.append([tracks["name"], 
+                        tracks["artists"][0]["name"], 
+                        tracks["album"]["name"],
+                        tracks["album"]["release_date"],])
         else:
             raise KeyError("Unexpected Spotify Url")
         return metadata
@@ -119,16 +131,13 @@ def dowload(title, artists, output_path):
     time.sleep(0.5)
     change_filename(title, out_path)
 
-try:
-    url = "https://open.spotify.com/playlist/6cXhgrplooa8hGCdGViA6u?si=559a49fc18d04cf2"
-    track = Metadata(url)
-    metadata = track.track_metadata(playlist=spotify_url_parser(url))
-    """for data in metadata:
+
+url = "https://open.spotify.com/playlist/6cXhgrplooa8hGCdGViA6u?si=1619440506d9408b"
+track = Metadata(url)
+metadata = track.track_metadata(playlist=spotify_url_parser(url))
+"""for data in metadata:
         title = data[0]
         artists = data[1]
         dowload(title, artists, out_path)
         print("\n")
 """
-
-except Exception as e:
-    print('An error occurred:', e)
