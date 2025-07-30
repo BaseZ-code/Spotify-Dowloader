@@ -57,9 +57,7 @@ class Metadata():
                             track["album"]["name"],
                             track["album"]["release_date"]])
 
-                print(total_tracks)
-                print(metadata[current_track-1], len(metadata))
-                print(current_track)
+                print(f"Fetching data.. {current_track} / {total_tracks}")
 
                 if current_track == total_tracks:
                     break
@@ -75,6 +73,10 @@ class Metadata():
         else:
             raise KeyError("Unexpected Spotify Url")
         return metadata
+
+# Clear the terminal
+def clear_terminal():
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 # Spotify URL parser help determind either the url is a playlist or a track.
 def spotify_url_parser(url: str) -> bool:
@@ -101,6 +103,9 @@ def change_filename(title, output_path):
     
     old_name = os.path.join(output_path, recently_added_file)
     new_name = os.path.join(output_path, f"{sanitized_title}.{ext}")
+
+    if os.path.exists(old_name):
+        time.sleep(0.5)
 
     print(f"Changing name from '{old_name}' to '{new_name}'")
     os.rename(old_name, new_name)
@@ -133,12 +138,15 @@ def dowload(title, artists, output_path):
     time.sleep(0.5)
     change_filename(title, out_path)
 
-
-url = "https://open.spotify.com/playlist/6cXhgrplooa8hGCdGViA6u?si=432dd00b8d504d33"
-track = Metadata(url)
-metadata = track.track_metadata(playlist=spotify_url_parser(url))
-for data in metadata:
-        title = data[0]
-        artists = data[1]
-        dowload(title, artists, out_path)
-        print("\n")
+try:
+    url = input("Enter Spotify URL(Song/Playlist): ")
+    track = Metadata(url)
+    metadata = track.track_metadata(playlist=spotify_url_parser(url))
+    for data in metadata:
+            title = data[0]
+            artists = data[1]
+            dowload(title, artists, out_path)
+            print("\n")
+            
+except Exception as e:
+    print("Error occured", e)
