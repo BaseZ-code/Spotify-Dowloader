@@ -98,17 +98,23 @@ def sanitize_filename(name):
 def change_filename(title, output_path):
     sanitized_title = sanitize_filename(title)
     files = os.listdir(output_path)
-    ext = "mp3"
+    ext = ".mp3"
     recently_added_file = max(files, key=lambda f: os.path.getmtime(os.path.join(out_path, f)))
     
     old_name = os.path.join(output_path, recently_added_file)
-    new_name = os.path.join(output_path, f"{sanitized_title}.{ext}")
+    new_name = os.path.join(output_path, sanitized_title)
+    
+    counter = 0
+    while os.path.exists(old_name):
+        counter += 1
+        countered_name = os.path.join(new_name, f"({counter}){ext}")
+        if os.path.exists(new_name):
+            os.rename(new_name, countered_name)
+        else:
+            break
 
-    if os.path.exists(old_name):
-        time.sleep(0.5)
-
-    print(f"Changing name from '{old_name}' to '{new_name}'")
-    os.rename(old_name, new_name)
+    print(f"Changing name from '{old_name}' to '{new_name}{ext}'")
+    os.rename(old_name, new_name+ext)
 
 # Yt_dlp Download function
 def dowload(title, artists, output_path):
