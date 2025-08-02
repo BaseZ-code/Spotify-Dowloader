@@ -99,13 +99,21 @@ def change_filename(title, output_path):
     sanitized_title = sanitize_filename(title)
     files = os.listdir(output_path)
     ext = "mp3"
+    counter = 0
     recently_added_file = max(files, key=lambda f: os.path.getmtime(os.path.join(out_path, f)))
     
     old_name = os.path.join(output_path, recently_added_file)
     new_name = os.path.join(output_path, f"{sanitized_title}.{ext}")
 
-    if os.path.exists(old_name):
-        time.sleep(0.5)
+    while os.path.exists(new_name):
+        counter += 1
+        new_countered_name = os.path.join(output_path, f"{sanitized_title}({counter}).{ext}")
+        if os.path.exists(new_countered_name):
+            continue
+        else:
+            print(f"Changing name from '{new_name}' to '{new_countered_name}'")
+            os.rename(new_name, new_countered_name)
+            return
 
     print(f"Changing name from '{old_name}' to '{new_name}'")
     os.rename(old_name, new_name)
