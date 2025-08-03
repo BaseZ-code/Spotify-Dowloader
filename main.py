@@ -2,6 +2,8 @@ import yt_dlp
 import os
 import sys
 import time
+from pathlib import Path
+from dataclasses import dataclass
 from dotenv import load_dotenv
 from mutagen.id3 import ID3, TPE1 , TIT2, TALB, TYER, TPE2
 import spotipy
@@ -9,32 +11,68 @@ from spotipy.oauth2 import SpotifyClientCredentials
 load_dotenv()
 
 # Settings
-sys.path.append(os.getcwd())
+class DowloaderConfig:
+    def __init__(self):
+        self.output_path = Path.home() / "Music" / "Songs"
+        self.cookies_path = Path.home() / "OneDrive" / "Documents" / "cookies.txt"
+        self.preferedcodec = "mp3"
+        self.format = "bestaudio/best"
+    
+    def DownloaderOptions(self, data):
+        self.data = data
+        ydl_opts = {
+            'default_search': 'ytsearch',
+            'noplaylist' : True,
+            'noprogress' : True,
+            'no_warnings' : True,
+            "cookiefile": self.cookies_path,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': self.preferedcodec,
+                'preferredquality': '192',
+            }],
+            'Metadata_replacerPP': [],
+            'format': self.format,
+            'outtmpl': f'{self.output_path}/%(title)s.%(ext)s'
+        }
+        return ydl_opts
+
+# Initialize Spotify API
+Path.cwd()
 auth_manager = SpotifyClientCredentials( 
     client_id=os.getenv('CILENT_ID'), 
     client_secret=os.getenv('CILENT_SECRET')
     )
 sp = spotipy.Spotify(auth_manager=auth_manager)
-out_path = "C:/Users/zigma/Music/Songs"
+config = DowloaderConfig()
+out_path = config.output_path
+out_path.mkdir(parents=True, exist_ok=True)  # Create the output directory if it doesn't exist
+cookies_path = config.cookies_path
 
-# Create a Directory
-if not os.path.exists(out_path):
-    os.makedirs(out_path)
-    
 # Class which will be used in yt_dlp Postprocessor -> Use to add metadata to a file.
 class Metadata_replacerPP(yt_dlp.postprocessor.PostProcessor):
-    def run(self, info,):
-        global data
+    def __init__(self, metadata):
+        super().__init__()
+        self.name, self.artist, self.album, self.year = metadata.title, metadata.artist, metadata.album, metadata.realse_date
+
+    def run(self, info):
         audiopath = info['filepath']
         audio = ID3(audiopath)
-        audio.add(TIT2(encoding=3, text=data[0]))
-        audio.add(TPE1(encoding=3, text=data[1]))
-        audio.add(TALB(encoding=3, text=data[2]))
-        audio.add(TYER(encoding=3, text=data[3]))
+        audio.add(TIT2(encoding=3, text=self.name))
+        audio.add(TPE1(encoding=3, text=self.artist))
+        audio.add(TALB(encoding=3, text=self.album))
+        audio.add(TYER(encoding=3, text=self.year))
         audio.save()
 
         return [], info
     
+@dataclass
+class Track:
+    title: str
+    artist: str
+    album: str
+    realse_date: str
+
 # A place holder for a file's metadata before inserting in using Metadata_replacerPP()
 class Metadata():
     global sp
@@ -46,30 +84,27 @@ class Metadata():
         metadata = []
         current_track = 0
         if playlist:
-            while True:
-                tracks = sp.playlist_tracks(self.url, limit=100, offset=current_track, additional_types=('track',))
+            current_track = 0
+            limit = 100
+            total_tracks = sp.playlist_tracks(self.url, limit=1)['total']
+            for offset in range(0, total_tracks, 1):
+                tracks = sp.playlist_tracks(self.url, additional_types=('track',), offset=offset, limit=limit)
                 track = tracks["items"][0]['track']
-                total_tracks = tracks['total']
-
-                current_track += 1
-                metadata.append([track['name'], 
+                
+                metadata.append(Track(
+                            track['name'], 
                             track['artists'][0]['name'], 
                             track["album"]["name"],
-                            track["album"]["release_date"]])
+                            track["album"]["release_date"]))
 
-                print(f"Fetching data.. {current_track} / {total_tracks}")
-
-                if current_track == total_tracks:
-                    break
-                else:
-                    pass
+                print(f"Fetching data.. {offset} / {total_tracks}")
 
         elif not playlist:
             tracks = sp.track(self.url)
-            metadata.append([tracks["name"], 
+            metadata.append(Track(tracks["name"], 
                         tracks["artists"][0]["name"], 
                         tracks["album"]["name"],
-                        tracks["album"]["release_date"],])
+                        tracks["album"]["release_date"]))
         else:
             raise KeyError("Unexpected Spotify Url")
         return metadata
@@ -97,64 +132,51 @@ def sanitize_filename(name):
 # Use for changing file name
 def change_filename(title, output_path):
     sanitized_title = sanitize_filename(title)
-    files = os.listdir(output_path)
+    files = list(output_path.iterdir())
     ext = "mp3"
-    counter = 0
-    recently_added_file = max(files, key=lambda f: os.path.getmtime(os.path.join(out_path, f)))
+    recently_added_file = max(files, key=lambda f: (out_path / f).st_mtime())
     
-    old_name = os.path.join(output_path, recently_added_file)
-    new_name = os.path.join(output_path, f"{sanitized_title}.{ext}")
+    old_name = output_path / recently_added_file
+    new_name = output_path / f"{sanitized_title}.{ext}"
 
-    while os.path.exists(new_name):
+    while new_name.exists():
         counter += 1
-        new_countered_name = os.path.join(output_path, f"{sanitized_title}({counter}).{ext}")
-        if os.path.exists(new_countered_name):
+        new_countered_name = output_path / f"{sanitized_title}({counter}).{ext}"
+        if new_countered_name.exists():
             continue
         else:
+            new_name.rename(new_countered_name)
             print(f"Changing name from '{new_name}' to '{new_countered_name}'")
-            os.rename(new_name, new_countered_name)
             return
 
     print(f"Changing name from '{old_name}' to '{new_name}'")
     os.rename(old_name, new_name)
 
 # Yt_dlp Download function
-def dowload(title, artists, output_path):
+def dowload(data, output_path):
 
     # Download options
-    ydl_opts = {
-        'default_search': 'ytsearch',
-        'noplaylist' : True,
-        'noprogress' : True,
-        'no_warnings' : True,
-        "cookiefile": "C:/Users/zigma/OneDrive/Documents/cookies.txt",
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'Metadata_replacerPP': [],
-        'format': 'bestaudio/best',
-        #'progress_hooks': [lambda d: print(f"Downloading: ({d['_percent_str']})")],
-        'outtmpl': f'{output_path}/%(title)s.%(ext)s'
-    }
-
+    ydl_opts = config.DownloaderOptions(data)
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.add_post_processor(Metadata_replacerPP(), when='post_process')
-        ydl.download([f"{title} {artists} lyrics"])
+        ydl.add_post_processor(Metadata_replacerPP(data), when='post_process')
+        ydl.download([f"{data.title} {data.artist} lyrics"])
 
     time.sleep(0.5)
-    change_filename(title, out_path)
+    change_filename(data.title, output_path)
 
-try:
-    url = input("Enter Spotify URL(Song/Playlist): ")
+def main():
+    clear_terminal()
+    url = input("Enter Spotify URL(Song/Playlist): ").strip()
     track = Metadata(url)
     metadata = track.track_metadata(playlist=spotify_url_parser(url))
     for data in metadata:
-            title = data[0]
-            artists = data[1]
-            dowload(title, artists, out_path)
-            print("\n")
+        print(data)
+        #dowload(data, out_path)
+        print("\n")
+
+try:
+    if __name__ == "__main__":
+        main()
             
 except Exception as e:
     print("Error occured", e)
