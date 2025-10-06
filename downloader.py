@@ -1,4 +1,5 @@
-import yt_dlpimport os
+import yt_dlp
+import os
 import sys
 import time
 from pathlib import Path
@@ -113,7 +114,6 @@ class SpotifyDownloader():
     def download(self, data:Track) -> None:
         # Download options
         sanitized_title = self.sanitize_filename(data.title)
-        sanitized_artist = self.sanitize_filename(data.artist)
         output_template = self.output_path / f"{sanitized_title}.%(ext)s"
 
         ydl_opts = self.DownloaderOptions()
