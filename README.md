@@ -1,4 +1,4 @@
-# Spotify-Dowloader
+# Spotify-Downloader
 
 ![Language](https://img.shields.io/badge/language-Python-blue?logo=python)
 ![status](https://img.shields.io/badge/status-In_Progress-blue)
