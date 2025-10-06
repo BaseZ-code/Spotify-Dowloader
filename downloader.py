@@ -1,18 +1,16 @@
-import yt_dlp
-import os
+import yt_dlpimport os
 import sys
 import time
 from pathlib import Path
 from dataclasses import dataclass
 from dotenv import load_dotenv
-from mutagen.id3 import ID3, TPE1 , TIT2, TALB, TYER
+from mutagen.id3 import ID3, TPE1 , TIT2, TALB, TDRC
 import spotipy
 import concurrent.futures
 from spotipy.oauth2 import SpotifyClientCredentials
 load_dotenv()
 
 # Settings
-Path.cwd() / "Spotify-Dowloader"
 
 # Initialize Spotify API
 auth_manager = SpotifyClientCredentials( 
@@ -22,7 +20,8 @@ auth_manager = SpotifyClientCredentials(
 try:
     sp = spotipy.Spotify(auth_manager=auth_manager)
 except spotipy.SpotifyException as e:
-    print("Spotify API authentication failed. Please check your CLIENT_ID and CLIENT_SECRET.")  
+    print("Spotify API authentication failed. Please check your CLIENT_ID and CLIENT_SECRET.")
+    sys.exit(1)  
 
 @dataclass
 class Track:
@@ -37,8 +36,8 @@ class SpotifyDownloader():
         self.sp = sp
         self.url = url
         self.output_path = Path.home() / "Music" / "Songs"
-        self.cookies_path = Path.home() / "OneDrive" / "Documents" / "cookies.txt"
-        self.preferedcodec = "mp3"
+        self.cookies_path = Path.home() / "cookies.txt"
+        self.preferredcodec = "mp3"
         self.format = "bestaudio[ext=mp3]/best"
 
     # Spotify URL parser help determind either the url is a playlist or a track.
@@ -49,7 +48,8 @@ class SpotifyDownloader():
         elif "playlist" in urlList:
             return True
         else:
-            raise KeyError("Please enter the correct url.")
+            raise ValueError("Invalid Spotify URL format. Expected track or playlist URL.")
+        
     # Sanitize file name
     def sanitize_filename(self, name:str) -> str:
         invalid_chars = R'<>:"/\\|?*'
@@ -83,14 +83,13 @@ class SpotifyDownloader():
 
                 
 
-        elif not playlist:
+        else:
             tracks = self.sp.track(self.url)
             metadata.append(Track(tracks["name"], 
                         tracks["artists"][0]["name"], 
                         tracks["album"]["name"],
                         tracks["album"]["release_date"]))
-        else:
-            raise KeyError("Unexpected Spotify Url")
+            
         return metadata
 
     def DownloaderOptions(self):
@@ -102,17 +101,16 @@ class SpotifyDownloader():
             "cookiefile": f"{self.cookies_path}",
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
-                'preferredcodec': self.preferedcodec,
+                'preferredcodec': self.preferredcodec,
                 'preferredquality': '192',
             }],
-            'Metadata_replacerPP': [],
             'format': self.format,
             'outtmpl': f'{self.output_path}/%(title)s.%(ext)s'
         }
         return ydl_opts
     
     # Yt_dlp Download function
-    def dowload(self, data:Track) -> None:
+    def download(self, data:Track) -> None:
         # Download options
         sanitized_title = self.sanitize_filename(data.title)
         sanitized_artist = self.sanitize_filename(data.artist)
@@ -135,12 +133,15 @@ class Metadata_replacerPP(yt_dlp.postprocessor.PostProcessor):
         self.name, self.artist, self.album, self.release_date = metadata.title, metadata.artist, metadata.album, metadata.release_date
     def run(self, info):
         audiopath = info['filepath']
-        audio = ID3(audiopath)
-        audio.add(TIT2(encoding=3, text=self.name))
-        audio.add(TPE1(encoding=3, text=self.artist))
-        audio.add(TALB(encoding=3, text=self.album))
-        audio.add(TYER(encoding=3, text=self.release_date))
-        audio.save()
+        try:
+            audio = ID3(audiopath)
+            audio.add(TIT2(encoding=3, text=self.name))
+            audio.add(TPE1(encoding=3, text=self.artist))
+            audio.add(TALB(encoding=3, text=self.album))
+            audio.add(TDRC(encoding=3, text=self.release_date))
+            audio.save()
+        except Exception as e:
+            print(f"Failed to add metadata for {self.name} by {self.artist}: {e}")
 
         return [], info
 
@@ -161,7 +162,7 @@ def main():
         sys.exit(1)
     else:
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_track = {executor.submit(track_downloader.dowload, data): data for data in metadata}
+            future_to_track = {executor.submit(track_downloader.download, data): data for data in metadata}
             for future in concurrent.futures.as_completed(future_to_track):
                 data = future_to_track[future]
                 try:
@@ -171,9 +172,11 @@ def main():
                     print(f"Error downloading {data.title} by {data.artist}: {e}")
         print("All downloads completed.")
 
-try:
-    if __name__ == "__main__":
-       main()
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print("Error occurred", e)
+        sys.exit(1)
             
-except Exception as e:
-    print("Error occured", e)
