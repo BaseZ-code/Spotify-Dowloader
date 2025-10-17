@@ -33,11 +33,12 @@ class Track:
 
 # Downloader
 class SpotifyDownloader():
-    def __init__(self,sp:vars, url:str) -> None:
+    def __init__(self, url:str) -> None:
         self.sp = sp
         self.url = url
         self.output_path = Path.home() / "Music" / "Songs"
-        self.cookies_path = Path.home() / "cookies.txt"
+        self.cookies_path = "C:/OneDrive/Documents/GitHub/Spotify-Dowloader/cookies.txt"
+        self.ffmpeg_path = r"C:\OneDrive\Documents\ffmpeg-8.0-essentials_build\ffmpeg-8.0-essentials_build\bin\ffmpeg.exe"
         self.preferredcodec = "mp3"
         self.format = "bestaudio[ext=mp3]/best"
 
@@ -97,9 +98,11 @@ class SpotifyDownloader():
         ydl_opts = {
             'default_search': 'ytsearch',
             'noplaylist' : True,
+            'quiet' : True,
             'noprogress' : True,
             'no_warnings' : True,
-            "cookiefile": f"{self.cookies_path}",
+            'ffmpeg_location': self.ffmpeg_path,
+            "cookiefile": self.cookies_path,
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': self.preferredcodec,
@@ -123,7 +126,18 @@ class SpotifyDownloader():
             ydl.add_post_processor(Metadata_replacerPP(data), when='post_process')
             ydl.download([f"{data.title} {data.artist} lyrics"])
 
-        time.sleep(0.5)
+        time.sleep(0.5) # Small delay to avoid overwhelming the system
+
+    def concurrent_download(self, metadata:list) -> None:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_track = {executor.submit(self.download, data): data for data in metadata}
+            for future in concurrent.futures.as_completed(future_to_track):
+                data = future_to_track[future]
+                try:
+                    future.result()
+                    print(f"Downloaded: {data.title} by {data.artist}")
+                except Exception as e:
+                    print(f"Error downloading {data.title} by {data.artist}: {e}")
 
 # Class which will be used in yt_dlp Postprocessor -> Use to add metadata to a file.
 class Metadata_replacerPP(yt_dlp.postprocessor.PostProcessor):
@@ -153,7 +167,7 @@ def clear_terminal():
 def main():
     clear_terminal()
     url = input("Enter Spotify URL(Song/Playlist): ").strip()
-    track_downloader = SpotifyDownloader(sp, url)
+    track_downloader = SpotifyDownloader(url)
     track_downloader.output_path.mkdir(parents=True, exist_ok=True)  # Create the output directory if it doesn't exist
     metadata = track_downloader.track_metadata(playlist=track_downloader.spotify_url_parser(url))
     
@@ -161,15 +175,7 @@ def main():
         print("No metadata found for the provided URL.")
         sys.exit(1)
     else:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_track = {executor.submit(track_downloader.download, data): data for data in metadata}
-            for future in concurrent.futures.as_completed(future_to_track):
-                data = future_to_track[future]
-                try:
-                    future.result()
-                    print(f"Downloaded: {data.title} by {data.artist}")
-                except Exception as e:
-                    print(f"Error downloading {data.title} by {data.artist}: {e}")
+        track_downloader.concurrent_download(metadata)
         print("All downloads completed.")
 
 
