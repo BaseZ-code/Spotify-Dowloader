@@ -1,42 +1,80 @@
-from downloader import SpotifyDownloader
-from PIL import Image, ImageTk 
+from .downloader import SpotifyDownloader
+import importlib.resources as res
+import PyInstaller
+from PIL import Image
 import customtkinter
-import os
-import sys
-import time
+from tkinter import filedialog
+from pathlib import Path
 import threading
+import time
         
 
 class myApp(customtkinter.CTk):
     def __init__(self):
         super().__init__()
+        self.output_path = Path.home() / 'Music'
         self.title("Spotify Downloader")
         self.geometry("500x200")
         self.grid_rowconfigure(3, weight=0)
-        self.grid_columnconfigure((0,1,2,4), weight=0)
+        self.grid_columnconfigure((0,1,2,4,5), weight=0)
         self.resizable(False, False)
 
-        self.lightModeicon = customtkinter.CTkImage(light_image=Image.open("C:/OneDrive/Documents/GitHub/Spotify-Dowloader/assests/Nigger.png"),
-                                  dark_image=Image.open("C:/OneDrive/Documents/GitHub/Spotify-Dowloader/assests/Nigger.png"),
+        icons_file = ["light.png", "black.png"]
+        icons = {}
+
+        for icon in icons_file:
+            icons_path = res.files("src.assets") / icon
+            icons[icon] = Image.open(icons_path)
+
+        self.lightModeicon = customtkinter.CTkImage(light_image=icons["light.png"],
+                                  dark_image=icons["black.png"],
                                   size=(30, 30))
         
-        self.label = customtkinter.CTkLabel(self, 
+        self.title_label = customtkinter.CTkLabel(self, 
                                             text="Spotify Downloader",
                                             font=("Montserrat", 32, "bold"),
                                             fg_color="transparent")
-        self.label.grid(row=0, column=1, columnspan=2)
+        self.title_label.grid(row=0, column=1, columnspan=2, sticky="w", padx=10, pady=10)
+
+        self.file_label = customtkinter.CTkLabel(self,
+                                            text=f"Saving to: {self.output_path}",
+                                            font=("Montserrat", 13),
+                                            fg_color="transparent")
+        self.file_label.grid(row=4, column=1, columnspan=2, sticky="w")
+        self.browse_button = customtkinter.CTkButton(self, text="Browse", 
+                                              text_color= ("#000000", "#FFFFFF"),
+                                              width=65,
+                                              command=self.browse_button_callback, 
+                                              fg_color=("#0FE9A7", "#078345"))
+        self.browse_button.grid(row=4, column=0, padx=10, pady=10, sticky="w")
+
+        self.browse_cookies_button = customtkinter.CTkButton(self, text="Add Cookies",
+                                                text_color= ("#000000", "#FFFFFF"),
+                                                width=100,
+                                                command=self.cookeis_button_callback, 
+                                                fg_color=("#FF0000", "#8B0000"))
+        self.browse_cookies_button.grid(row=4, column=2, padx=10, pady=10, sticky="e")
 
         self.entry = customtkinter.CTkEntry(self, width=250, placeholder_text="Enter Spotify URL")
         self.entry.grid(row=2, column=1)
 
-        self.button = customtkinter.CTkButton(self, text="Download", command=self.button_callback, fg_color=("#3D1818", "#821D1A"))
-        self.button.grid(row=2, column=2, padx=10, pady=10)
+        self.download_button = customtkinter.CTkButton(self, text="Download", 
+                                              text_color= ("#000000", "#FFFFFF"),
+                                              command=self.button_callback, 
+                                              fg_color=("#0FE9A7", "#078345"))
+        self.download_button.grid(row=2, column=2, padx=10, pady=10, sticky="e")
 
-        self.appearance_switcher = customtkinter.CTkButton(self, image=self.lightModeicon, text="", command=self.appearance_mode, width=10, height=30, fg_color="#181818",hover_color="#000000" )
+        self.appearance_switcher = customtkinter.CTkButton(self, 
+                                                           image=self.lightModeicon, 
+                                                           text="", 
+                                                           command=self.appearance_mode, 
+                                                           width=10, height=30, 
+                                                           fg_color=("#D3D3D3", "#4F4F4F"),
+                                                           hover_color=("#878787", "#7A7A7A") )
         self.appearance_switcher.grid(row=0, column=0, padx=10, pady=10)
 
         self.progressbar = customtkinter.CTkProgressBar(self, orientation="horizontal", mode="indeterminate")
-        self.progressbar.grid(row=4, column=0, columnspan=3, padx=30, pady=20, sticky="ew")
+        self.progressbar.grid(row=3, column=0, columnspan=4, padx=10, pady=10, sticky="ew")
 
     def appearance_mode(self):
         if customtkinter.get_appearance_mode() == "Dark":
@@ -44,32 +82,58 @@ class myApp(customtkinter.CTk):
         else:
              return customtkinter.set_appearance_mode("Dark")
 
-    def button_callback(self):
-        self.progressbar.start()
-        user_input = self.entry.get().strip()
-        if user_input:
-            self.update_ui_ongoing_download()
-            self.button.configure(state="disabled")
-            self.entry.configure(state="disabled")
-            download_thread = threading.Thread(target=self.song_download, args=(user_input,), daemon=True)
-            download_thread.start()
+    def browse_button_callback(self):
+        folder_path = filedialog.askdirectory()
+        if folder_path:
+            self.output_path = folder_path
+            self.file_label.configure(text=f"Saving to: {self.output_path}")
+
+    def cookeis_button_callback(self):
+        cookies_path = filedialog.askopenfile(filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+        if cookies_path:
+            self.cookies_path = cookies_path.name
+            self.browse_cookies_button.configure(fg_color=("#0FE9A7", "#078345"))
         else:
-            print("Please enter a valid Spotify URL.")
+            self.browse_cookies_button.configure(fg_color=("#FF0000", "#8B0000"))
+
+    def button_callback(self):
+        user_input = self.entry.get().strip()
+        try:
+            if user_input and self.browse_cookies_button.cget("fg_color") == ("#0FE9A7", "#078345"):
+                self.progressbar.start()
+                self.update_ui_ongoing_download()
+                self.buttons_state("disabled")
+                download_thread = threading.Thread(target=self.song_download, args=(user_input,), daemon=True)
+                download_thread.start()
+            if not self.browse_cookies_button.cget("fg_color") == ("#0FE9A7", "#078345"):
+                print("Please add a valid cookies file.")
+                self.progressbar.stop()
+            if not user_input:
+                print("Please enter a valid Spotify URL.")
+                self.progressbar.stop()
+        except Exception as e:
+            print(f"Error: {e}")
+            self.buttons_state("normal")
             self.progressbar.stop()
 
     def song_download(self, user_input):
+        if not hasattr(self, 'output_path') or not hasattr(self, 'cookies_path'):
+            raise ValueError("Output path or Cookies path is not set. Please select recheck agian if you selected folder or provided cookies.")
         try:
-            downloader = SpotifyDownloader(user_input)
-            metadata = downloader.track_metadata(playlist=downloader.spotify_url_parser(user_input))
+            downloader = SpotifyDownloader(user_input, Path(self.output_path), Path(self.cookies_path))
+            metadata = downloader.track_metadata(playlist=downloader._SpotifyDownloader__spotify_url_parser(user_input))
             downloader.concurrent_download(metadata)
-            self.entry.configure(state="normal")
-            self.button.configure(state="normal")
+            self.buttons_state("normal")
             self.after(0, self.update_ui_on_completion)
         except Exception as e:
             print(f"Error during download: {e}")
-            self.entry.configure(state="normal")
-            self.button.configure(state="normal")
+            self.buttons_state("normal")
             self.after(0, self.update_ui_on_error)
+
+    def buttons_state(self, state: str):
+        self.download_button.configure(state=state)
+        self.entry.configure(state=state)
+        self.browse_button.configure(state=state)
 
     def update_ui_ongoing_download(self):
         self.entry.delete(0, 'end')
@@ -78,6 +142,8 @@ class myApp(customtkinter.CTk):
     def update_ui_on_completion(self):
       self.entry.delete(0, 'end')
       self.entry.insert(0, "All downloads completed.")
+      time.sleep(1)
+      self.entry.delete(0, 'end')
       self.progressbar.stop()
 
     def update_ui_on_error(self):

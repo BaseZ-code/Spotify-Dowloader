@@ -8,10 +8,9 @@ from dotenv import load_dotenv
 from mutagen.id3 import ID3, TPE1 , TIT2, TALB, TDRC
 import spotipy
 import concurrent.futures
+import imageio_ffmpeg
 from spotipy.oauth2 import SpotifyClientCredentials
 load_dotenv()
-
-# Settings
 
 # Initialize Spotify API
 auth_manager = SpotifyClientCredentials( 
@@ -33,17 +32,17 @@ class Track:
 
 # Downloader
 class SpotifyDownloader():
-    def __init__(self, url:str) -> None:
+    def __init__(self, url:str, out_path:str, cookies_path:str) -> None:
         self.sp = sp
         self.url = url
-        self.output_path = Path.home() / "Music" / "Songs"
-        self.cookies_path = "C:/OneDrive/Documents/GitHub/Spotify-Dowloader/cookies.txt"
-        self.ffmpeg_path = r"C:\OneDrive\Documents\ffmpeg-8.0-essentials_build\ffmpeg-8.0-essentials_build\bin\ffmpeg.exe"
+        self.output_path = Path(out_path)
+        self.cookies_path = Path(cookies_path)
+        self.ffmpeg_path = str(imageio_ffmpeg.get_ffmpeg_exe())
         self.preferredcodec = "mp3"
         self.format = "bestaudio[ext=mp3]/best"
 
     # Spotify URL parser help determind either the url is a playlist or a track.
-    def spotify_url_parser(self, url:str) -> bool:
+    def __spotify_url_parser(self, url:str) -> bool:
         urlList = url.split("/")[3:]
         if "track" in urlList:
             return False
@@ -59,42 +58,44 @@ class SpotifyDownloader():
             name = name.replace(ch, '_')
         return name.strip()
     
-    # Append each metadata lists into a list. Metadata list -> [name, artists, album, release date]
     def track_metadata(self, playlist:bool) -> list:
         metadata = []
         # Check if the url is a playlist or a track
         limit_tracks = 100
         current_track = 0
-        if playlist:
-            total_tracks = self.sp.playlist_tracks(self.url, limit=1)['total']
-            for offset in range(0, total_tracks, limit_tracks):
-                tracks = self.sp.playlist_tracks(self.url, additional_types=('track',), offset=offset, limit=limit_tracks)
-                for item in tracks["items"]:
-                    current_track+=1
-                    track = item["track"]
-                    if track:
-                        metadata.append(Track(
-                                    track['name'], 
-                                    track['artists'][0]['name'], 
-                                    track["album"]["name"],
-                                    track["album"]["release_date"]))
-                    else:
-                        print("Skipping a local track or unavailable track.")
-                        continue
-                    print(f"Fetching data.. {current_track} / {total_tracks}")
+        try:
+            if playlist:
+                total_tracks = self.sp.playlist_tracks(self.url, limit=1)['total']
+                for offset in range(0, total_tracks, limit_tracks):
+                    tracks = self.sp.playlist_tracks(self.url, additional_types=('track',), offset=offset, limit=limit_tracks)
+                    for item in tracks["items"]:
+                        current_track+=1
+                        track = item["track"]
+                        if track:
+                            metadata.append(Track(
+                                        track['name'], 
+                                        track['artists'][0]['name'], 
+                                        track["album"]["name"],
+                                        track["album"]["release_date"]))
+                        else:
+                            print("Skipping a local track or unavailable track.")
+                            continue
+                        print(f"Fetching data.. {current_track} / {total_tracks}")
 
-                
+                    
 
-        else:
-            tracks = self.sp.track(self.url)
-            metadata.append(Track(tracks["name"], 
-                        tracks["artists"][0]["name"], 
-                        tracks["album"]["name"],
-                        tracks["album"]["release_date"]))
-            
+            else:
+                tracks = self.sp.track(self.url)
+                metadata.append(Track(tracks["name"], 
+                            tracks["artists"][0]["name"], 
+                            tracks["album"]["name"],
+                            tracks["album"]["release_date"]))
+        except Exception as e:
+            print(f"Error fetching metadata from Spotify: {e}")
+            return []
         return metadata
 
-    def DownloaderOptions(self):
+    def __DownloaderOptions(self):
         ydl_opts = {
             'default_search': 'ytsearch',
             'noplaylist' : True,
@@ -119,12 +120,15 @@ class SpotifyDownloader():
         sanitized_title = self.sanitize_filename(data.title)
         output_template = self.output_path / f"{sanitized_title}.%(ext)s"
 
-        ydl_opts = self.DownloaderOptions()
+        ydl_opts = self.__DownloaderOptions()
         ydl_opts['outtmpl'] = str(output_template)
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.add_post_processor(Metadata_replacerPP(data), when='post_process')
-            ydl.download([f"{data.title} {data.artist} lyrics"])
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.add_post_processor(Metadata_replacerPP(data), when='post_process')
+                ydl.download([f"{data.title} {data.artist} lyrics"])
+        except Exception as e:
+            print(f"Error downloading {data.title}: {e}")
 
         time.sleep(0.5) # Small delay to avoid overwhelming the system
 
@@ -167,9 +171,9 @@ def clear_terminal():
 def main():
     clear_terminal()
     url = input("Enter Spotify URL(Song/Playlist): ").strip()
-    track_downloader = SpotifyDownloader(url)
+    track_downloader = SpotifyDownloader(url, out_path=r"C:\Users\zigma\Downloads", cookies_path=r"C:\OneDrive\Documents\GitHub\Spotify-Dowloader\cookies.txt")
     track_downloader.output_path.mkdir(parents=True, exist_ok=True)  # Create the output directory if it doesn't exist
-    metadata = track_downloader.track_metadata(playlist=track_downloader.spotify_url_parser(url))
+    metadata = track_downloader.track_metadata(playlist=track_downloader._SpotifyDownloader__spotify_url_parser(url))
     
     if not metadata:
         print("No metadata found for the provided URL.")
