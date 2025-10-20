@@ -5,4 +5,5 @@
 
 > [!NOTE]
 > This is a simple, yet efficient software use for downloading songs from **Spotify** using `yt_dlp` and `spotipy` with `cutomTkinter` GUI.
-> **To be mentioned**: this repository is literally my first official project in my programming journey.
+
+**To be mentioned**: this repository is literally my first official project in my programming journey.
