@@ -1,6 +1,5 @@
 from .downloader import SpotifyDownloader
 import importlib.resources as res
-import PyInstaller
 from PIL import Image
 import customtkinter
 from tkinter import filedialog
@@ -20,15 +19,17 @@ class myApp(customtkinter.CTk):
         self.resizable(False, False)
         
         # Load icons
-        icons_file = ["light.png", "black.png"]
-        icons = {}
-        for icon in icons_file:
-            icons_path = res.files("src.assets") / icon
-            icons[icon] = Image.open(icons_path)
+        self.icons_file = ["light.png", "black.png"]
+        self.icons = {}
+        self._icon_paths = []  # Store persistent references to the path objects
+        for icon in self.icons_file:
+            icon_path = res.files("src.assets") / icon
+            self._icon_paths.append(icon_path)
+            self.icons[icon] = Image.open(icon_path)
 
         # Light/Dark mode icon
-        self.lightModeicon = customtkinter.CTkImage(light_image=icons["light.png"],
-                                  dark_image=icons["black.png"],
+        self.lightModeicon = customtkinter.CTkImage(light_image=self.icons["light.png"],
+                                  dark_image=self.icons["black.png"],
                                   size=(30, 30))
         
         # UI Elements
@@ -48,7 +49,7 @@ class myApp(customtkinter.CTk):
                                               text_color= ("#000000", "#FFFFFF"),
                                               width=65,
                                               command=self.browse_button_callback, 
-                                              fg_color=("#0FE9A7", "#078345"))
+                                              fg_color=("#68EEC6", "#078345"))
         self.browse_button.grid(row=4, column=0, padx=10, pady=10, sticky="w")
 
         # Cookies file browse button
@@ -56,7 +57,7 @@ class myApp(customtkinter.CTk):
                                                 text_color= ("#000000", "#FFFFFF"),
                                                 width=100,
                                                 command=self.cookeis_button_callback, 
-                                                fg_color=("#FF0000", "#8B0000"))
+                                                fg_color=("#F07474", "#8B0000"))
         self.browse_cookies_button.grid(row=4, column=2, padx=10, pady=10, sticky="e")
 
         # Spotify URL entry and download button
@@ -66,7 +67,7 @@ class myApp(customtkinter.CTk):
         self.download_button = customtkinter.CTkButton(self, text="Download", 
                                               text_color= ("#000000", "#FFFFFF"),
                                               command=self.button_callback, 
-                                              fg_color=("#0FE9A7", "#078345"))
+                                              fg_color=("#68EEC6", "#078345"))
         self.download_button.grid(row=2, column=2, padx=10, pady=10, sticky="e")
 
         # Appearance mode switcher
@@ -104,9 +105,9 @@ class myApp(customtkinter.CTk):
         cookies_path = filedialog.askopenfile(filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
         if cookies_path:
             self.cookies_path = cookies_path.name
-            self.browse_cookies_button.configure(fg_color=("#0FE9A7", "#078345"))
+            self.browse_cookies_button.configure(fg_color=("#68EEC6", "#078345"))
         else:
-            self.browse_cookies_button.configure(fg_color=("#FF0000", "#8B0000"))
+            self.browse_cookies_button.configure(fg_color=("#F07474", "#8B0000"))
 
     # Download button callback
     def button_callback(self):
@@ -114,7 +115,7 @@ class myApp(customtkinter.CTk):
         user_input = self.entry.get().strip()
         try:
             # Checking for valid input and cookies file
-            if user_input and self.browse_cookies_button.cget("fg_color") == ("#0FE9A7", "#078345"):
+            if user_input and self.browse_cookies_button.cget("fg_color") == ("#68EEC6", "#078345"):
                 self.progressbar.start()
                 self.update_ui_ongoing_download()
                 self.buttons_state("disabled")
@@ -122,7 +123,7 @@ class myApp(customtkinter.CTk):
                 download_thread.start()
 
             # If not valid input or cookies file
-            if not self.browse_cookies_button.cget("fg_color") == ("#0FE9A7", "#078345"):
+            if not self.browse_cookies_button.cget("fg_color") == ("#68EEC6", "#078345"):
                 print("Please add a valid cookies file.")
                 self.progressbar.stop()
             if not user_input:
@@ -172,7 +173,3 @@ class myApp(customtkinter.CTk):
       self.entry.delete(0, 'end')
       self.entry.insert(0, "An error occurred during download.")
       self.progressbar.stop()
-
-# Run the application
-app = myApp()
-app.mainloop()
