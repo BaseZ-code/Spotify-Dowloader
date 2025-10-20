@@ -5,6 +5,8 @@ import customtkinter
 from tkinter import filedialog
 from pathlib import Path
 import sys
+import psutil
+import os
 import threading
         
 # Main Application Class
@@ -87,17 +89,38 @@ class myApp(customtkinter.CTk):
         # Checking X button close
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+    # Handle window close event
+    def on_closing(self):
+        try:
+            # Get the current process
+            parent = psutil.Process(os.getpid())
+            # Get all child processes (recursive=True finds children of children)
+            children = parent.children(recursive=True)
+
+            # Terminate all child processes
+            for child in children:
+                child.kill()
+
+            # Terminate the parent process
+            parent.kill()
+            sys.exit(0)
+
+        except psutil.NoSuchProcess: # Process already terminated
+            print(f"Error closing application: {e}")
+            sys.exit(1)
+
+        except Exception as e:
+            print(f"Error closing application: {e}")
+            sys.exit(1)
+        
+        self.destroy()
+
     # Toggle appearance mode
     def appearance_mode(self):
         if customtkinter.get_appearance_mode() == "Dark":
              return customtkinter.set_appearance_mode("Light")
         else:
              return customtkinter.set_appearance_mode("Dark")
-    
-    # Checking X button close
-    def on_closing(self):
-        self.destroy()
-        sys.exit(0)
 
     # Browse button callback
     def browse_button_callback(self):
@@ -121,22 +144,25 @@ class myApp(customtkinter.CTk):
     def button_callback(self):
         # Getting user input
         user_input = self.entry.get().strip()
+
+        if not user_input or "spotify.com" not in user_input:
+            print("Please enter a valid Spotify URL.")
+            self.progressbar.stop()
+            return
+        
+        # If not valid input or cookies file
+        if not self.browse_cookies_button.cget("fg_color") == ("#6DDDBB", "#078345"):
+            print("Please add a valid cookies file.")
+            self.progressbar.stop()
+            return
         try:
             # Checking for valid input and cookies file
-            if user_input and self.browse_cookies_button.cget("fg_color") == ("#68EEC6", "#078345"):
+            if user_input and self.browse_cookies_button.cget("fg_color") == ("#6DDDBB", "#078345"):
                 self.progressbar.start()
                 self.update_ui_ongoing_download()
                 self.buttons_state("disabled")
                 download_thread = threading.Thread(target=self.song_download, args=(user_input,), daemon=True)
                 download_thread.start()
-
-            # If not valid input or cookies file
-            if not self.browse_cookies_button.cget("fg_color") == ("#68EEC6", "#078345"):
-                print("Please add a valid cookies file.")
-                self.progressbar.stop()
-            if not user_input:
-                print("Please enter a valid Spotify URL.")
-                self.progressbar.stop()
         except Exception as e:
             print(f"Error: {e}")
             self.buttons_state("normal")
@@ -169,7 +195,7 @@ class myApp(customtkinter.CTk):
     # UI updates during downloading/ on completion/ error
     def update_ui_ongoing_download(self):
         self.entry.delete(0, 'end')
-        self.entry.insert(0, "Currently Downloading...")
+        self.entry.insert(0, "Processing... Do not close the GUI.")
 
     def update_ui_on_completion(self):
       self.entry.delete(0, 'end')
