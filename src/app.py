@@ -4,8 +4,8 @@ from PIL import Image
 import customtkinter
 from tkinter import filedialog
 from pathlib import Path
+import sys
 import threading
-import time
         
 # Main Application Class
 class myApp(customtkinter.CTk):
@@ -49,7 +49,7 @@ class myApp(customtkinter.CTk):
                                               text_color= ("#000000", "#FFFFFF"),
                                               width=65,
                                               command=self.browse_button_callback, 
-                                              fg_color=("#68EEC6", "#078345"))
+                                              fg_color=("#6DDDBB", "#078345"))
         self.browse_button.grid(row=4, column=0, padx=10, pady=10, sticky="w")
 
         # Cookies file browse button
@@ -67,7 +67,7 @@ class myApp(customtkinter.CTk):
         self.download_button = customtkinter.CTkButton(self, text="Download", 
                                               text_color= ("#000000", "#FFFFFF"),
                                               command=self.button_callback, 
-                                              fg_color=("#68EEC6", "#078345"))
+                                              fg_color=("#6DDDBB", "#078345"))
         self.download_button.grid(row=2, column=2, padx=10, pady=10, sticky="e")
 
         # Appearance mode switcher
@@ -83,6 +83,9 @@ class myApp(customtkinter.CTk):
         # Progress bar
         self.progressbar = customtkinter.CTkProgressBar(self, orientation="horizontal", mode="indeterminate")
         self.progressbar.grid(row=3, column=0, columnspan=4, padx=10, pady=10, sticky="ew")
+        
+        # Checking X button close
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     # Toggle appearance mode
     def appearance_mode(self):
@@ -91,6 +94,11 @@ class myApp(customtkinter.CTk):
         else:
              return customtkinter.set_appearance_mode("Dark")
     
+    # Checking X button close
+    def on_closing(self):
+        self.destroy()
+        sys.exit(0)
+
     # Browse button callback
     def browse_button_callback(self):
         # Finding folder path
@@ -105,9 +113,9 @@ class myApp(customtkinter.CTk):
         cookies_path = filedialog.askopenfile(filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
         if cookies_path:
             self.cookies_path = cookies_path.name
-            self.browse_cookies_button.configure(fg_color=("#68EEC6", "#078345"))
+            self.browse_cookies_button.configure(fg_color=("#6DDDBB", "#078345"))
         else:
-            self.browse_cookies_button.configure(fg_color=("#F07474", "#8B0000"))
+            self.browse_cookies_button.configure(fg_color=("#DF5D5D", "#8B0000"))
 
     # Download button callback
     def button_callback(self):
@@ -156,6 +164,7 @@ class myApp(customtkinter.CTk):
         self.download_button.configure(state=state)
         self.entry.configure(state=state)
         self.browse_button.configure(state=state)
+        self.browse_cookies_button.configure(state=state)
 
     # UI updates during downloading/ on completion/ error
     def update_ui_ongoing_download(self):
@@ -165,8 +174,6 @@ class myApp(customtkinter.CTk):
     def update_ui_on_completion(self):
       self.entry.delete(0, 'end')
       self.entry.insert(0, "All downloads completed.")
-      time.sleep(1)
-      self.entry.delete(0, 'end')
       self.progressbar.stop()
 
     def update_ui_on_error(self):
