@@ -132,7 +132,7 @@ venv.bak/
 # Ignore YouTube cookies file
 cookies.txt
 SECRET.json
-secrets.json
+secret.json
 
 # Spyder project settings
 .spyderproject
